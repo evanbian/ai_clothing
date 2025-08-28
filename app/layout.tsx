@@ -11,11 +11,15 @@ const openSans = Open_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Image Editor",
-  description: "Edit images using Google DeepMind Gemini 2.0",
+  title: "AI试衣间 - 智能服装试穿",
+  description: "使用AI技术实现虚拟试衣效果",
 };
 
 export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "white" },
     { media: "(prefers-color-scheme: dark)", color: "black" },

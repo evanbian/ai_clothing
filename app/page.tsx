@@ -1,164 +1,271 @@
 "use client";
 import { useState } from "react";
-import { ImageUpload } from "@/components/ImageUpload";
-import { ImagePromptInput } from "@/components/ImagePromptInput";
-import { ImageResultDisplay } from "@/components/ImageResultDisplay";
-import { ImageIcon, Wand2 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { HistoryItem } from "@/lib/types";
+import { TryOnUploader } from "@/components/TryOnUploader";
+import { ScenePresets } from "@/components/ScenePresets";
+import { TryOnGallery } from "@/components/TryOnGallery";
+import { AnalysisPanel } from "@/components/AnalysisPanel";
+import { Shirt, Sparkles, AlertCircle, Shield } from "lucide-react";
+import { performSafetyCheck } from "@/lib/safety-validator";
+
+interface TryOnResult {
+  id: string;
+  image: string;
+  background?: string;
+  pose?: string;
+  mood?: string;
+  timestamp: number;
+  description?: string;
+}
+
+interface PresetOptions {
+  background?: string;
+  pose?: string;
+  mood?: string;
+  fitStyle?: "slim" | "regular" | "loose";
+  customPrompt?: string;
+}
 
 export default function Home() {
-  const [image, setImage] = useState<string | null>(null);
-  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
-  const [description, setDescription] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [userPhoto, setUserPhoto] = useState<string | null>(null);
+  const [clothingImage, setClothingImage] = useState<string | null>(null);
+  const [results, setResults] = useState<TryOnResult[]>([]);
+  const [currentPreset, setCurrentPreset] = useState<PresetOptions>({});
+  const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [currentAnalysisImage, setCurrentAnalysisImage] = useState<string | null>(null);
 
-  const handleImageSelect = (imageData: string) => {
-    setImage(imageData || null);
+  const handleImagesReady = (userImg: string, clothingImg: string) => {
+    setUserPhoto(userImg);
+    setClothingImage(clothingImg);
+    setError(null);
   };
 
-  const handlePromptSubmit = async (prompt: string) => {
+  const handlePresetChange = (preset: PresetOptions) => {
+    setCurrentPreset(preset);
+  };
+
+  const handleGenerate = async () => {
+    if (!userPhoto || !clothingImage) {
+      setError("请先上传您的照片和想试穿的衣服");
+      return;
+    }
+
+    // Frontend safety validation
+    const safetyCheck = performSafetyCheck({
+      userPhoto,
+      clothingImage,
+      ...currentPreset,
+    });
+
+    if (!safetyCheck.isSafe) {
+      setError(safetyCheck.message || "您的请求包含不适当内容，请修改后重试");
+      return;
+    }
+
+    setIsGenerating(true);
+    setError(null);
+
     try {
-      setLoading(true);
-      setError(null);
-
-      // If we have a generated image, use that for editing, otherwise use the uploaded image
-      const imageToEdit = generatedImage || image;
-
-      // Prepare the request data as JSON
-      const requestData = {
-        prompt,
-        image: imageToEdit,
-        history: history.length > 0 ? history : undefined,
-      };
-
-      const response = await fetch("/api/image", {
+      const response = await fetch("/api/tryon/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(requestData),
+        body: JSON.stringify({
+          userPhoto,
+          clothingImage,
+          ...currentPreset,
+        }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to generate image");
+        throw new Error(errorData.error || "生成失败");
       }
 
       const data = await response.json();
-
+      
       if (data.image) {
-        // Update the generated image and description
-        setGeneratedImage(data.image);
-        setDescription(data.description || null);
-
-        // Update history locally - add user message
-        const userMessage: HistoryItem = {
-          role: "user",
-          parts: [
-            { text: prompt },
-            ...(imageToEdit ? [{ image: imageToEdit }] : []),
-          ],
+        const newResult: TryOnResult = {
+          id: Date.now().toString(),
+          image: data.image,
+          background: currentPreset.background,
+          pose: currentPreset.pose,
+          mood: currentPreset.mood,
+          timestamp: Date.now(),
+          description: data.description,
         };
-
-        // Add AI response
-        const aiResponse: HistoryItem = {
-          role: "model",
-          parts: [
-            ...(data.description ? [{ text: data.description }] : []),
-            ...(data.image ? [{ image: data.image }] : []),
-          ],
-        };
-
-        // Update history with both messages
-        setHistory((prevHistory) => [...prevHistory, userMessage, aiResponse]);
+        
+        setResults(prev => [newResult, ...prev]);
+        setCurrentAnalysisImage(data.image);
       } else {
-        setError("No image returned from API");
+        // Handle case where API doesn't return image yet
+        setError("当前API暂不支持图像生成，请检查API配置");
       }
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "An error occurred");
-      console.error("Error processing request:", error);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "生成失败");
+      console.error("Generation error:", err);
     } finally {
-      setLoading(false);
+      setIsGenerating(false);
     }
   };
 
-  const handleReset = () => {
-    setImage(null);
-    setGeneratedImage(null);
-    setDescription(null);
-    setLoading(false);
-    setError(null);
-    setHistory([]);
+  const handleAnalyze = async (image: string): Promise<any> => {
+    try {
+      const response = await fetch("/api/tryon/analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          tryOnImage: image,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "分析失败");
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (err) {
+      console.error("Analysis error:", err);
+      throw err;
+    }
   };
 
-  // If we have a generated image, we want to edit it next time
-  const currentImage = generatedImage || image;
-  const isEditing = !!currentImage;
-
-  // Get the latest image to display (always the generated image)
-  const displayImage = generatedImage;
+  const handleAnalyzeClick = (image: string) => {
+    setCurrentAnalysisImage(image);
+  };
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-background p-8">
-      <Card className="w-full max-w-4xl border-0 bg-card shadow-none">
-        <CardHeader className="flex flex-col items-center justify-center space-y-2">
-          <CardTitle className="flex items-center gap-2 text-foreground">
-            <Wand2 className="w-8 h-8 text-primary" />
-            Image Creation & Editing
-          </CardTitle>
-          <span className="text-sm font-mono text-muted-foreground">
-            powered by Google DeepMind Gemini 2.0 Flash
-          </span>
-        </CardHeader>
-        <CardContent className="space-y-6 pt-6 w-full">
-          {error && (
-            <div className="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg">
-              {error}
+    <main className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50">
+      {/* Header */}
+      <header className="border-b bg-white/80 backdrop-blur">
+        <div className="container mx-auto px-3 md:px-4 py-3 md:py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 md:gap-3">
+              <Shirt className="w-6 h-6 md:w-8 md:h-8 text-purple-600" />
+              <div>
+                <h1 className="text-lg md:text-2xl font-bold text-gray-900">AI智能试衣间</h1>
+                <p className="text-xs md:text-sm text-gray-500 hidden md:block">
+                  Powered by Gemini 2.5 Flash & 2.0 Flash
+                </p>
+              </div>
             </div>
-          )}
+            <div className="hidden sm:flex items-center gap-2">
+              <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-yellow-500" />
+              <span className="text-xs md:text-sm text-gray-600">AI试衣新体验</span>
+            </div>
+          </div>
+        </div>
+      </header>
 
-          {!displayImage && !loading ? (
-            <>
-              <ImageUpload
-                onImageSelect={handleImageSelect}
-                currentImage={currentImage}
-              />
-              <ImagePromptInput
-                onSubmit={handlePromptSubmit}
-                isEditing={isEditing}
-                isLoading={loading}
-              />
-            </>
-          ) : loading ? (
-            <div
-              role="status"
-              className="flex items-center mx-auto justify-center h-56 max-w-sm bg-gray-300 rounded-lg animate-pulse dark:bg-secondary"
-            >
-              <ImageIcon className="w-10 h-10 text-gray-200 dark:text-muted-foreground" />
-              <span className="pl-4 font-mono font-xs text-muted-foreground">
-                Processing...
-              </span>
+      {/* Main Content */}
+      <div className="container mx-auto px-3 md:px-4 py-4 md:py-8">
+        {/* Safety Notice */}
+        <div className="mb-4 md:mb-6 p-3 md:p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-start gap-2">
+            <Shield className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="text-sm font-semibold text-blue-900">安全使用提示</h3>
+              <p className="text-xs md:text-sm text-blue-700 mt-1">
+                本系统仅支持生成健康、得体的服装试穿效果。严禁上传或生成裸露、色情、暴力、违法等不当内容。
+                系统会自动检测并拒绝不当请求。
+              </p>
             </div>
-          ) : (
-            <>
-              <ImageResultDisplay
-                imageUrl={displayImage || ""}
-                description={description}
-                onReset={handleReset}
-                conversationHistory={history}
+          </div>
+        </div>
+        
+        {/* Error Display */}
+        {error && (
+          <div className="mb-4 md:mb-6 p-3 md:p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm md:text-base text-red-700">{error}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 1: Upload Images */}
+        <div className="mb-6 md:mb-8">
+          <h2 className="text-base md:text-lg font-semibold mb-3 md:mb-4 flex items-center gap-2">
+            <span className="w-6 h-6 md:w-8 md:h-8 bg-purple-600 text-white rounded-full flex items-center justify-center text-xs md:text-sm">
+              1
+            </span>
+            上传图片
+          </h2>
+          <TryOnUploader
+            onImagesReady={handleImagesReady}
+            onError={setError}
+          />
+        </div>
+
+        {/* Step 2: Scene Settings */}
+        {userPhoto && clothingImage && (
+          <div className="mb-6 md:mb-8">
+            <h2 className="text-base md:text-lg font-semibold mb-3 md:mb-4 flex items-center gap-2">
+              <span className="w-6 h-6 md:w-8 md:h-8 bg-purple-600 text-white rounded-full flex items-center justify-center text-xs md:text-sm">
+                2
+              </span>
+              场景设置
+            </h2>
+            <ScenePresets
+              onPresetChange={handlePresetChange}
+              onGenerateClick={handleGenerate}
+              isGenerating={isGenerating}
+            />
+          </div>
+        )}
+
+        {/* Step 3: Results */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+          {/* Gallery - takes 2 columns on large screens */}
+          <div className="lg:col-span-2">
+            {(results.length > 0 || isGenerating) && (
+              <>
+                <h2 className="text-base md:text-lg font-semibold mb-3 md:mb-4 flex items-center gap-2">
+                  <span className="w-6 h-6 md:w-8 md:h-8 bg-purple-600 text-white rounded-full flex items-center justify-center text-xs md:text-sm">
+                    3
+                  </span>
+                  试衣效果
+                </h2>
+                <TryOnGallery
+                  results={results}
+                  onAnalyze={handleAnalyzeClick}
+                  isLoading={isGenerating}
+                />
+              </>
+            )}
+          </div>
+
+          {/* Analysis Panel - takes 1 column on large screens */}
+          {(results.length > 0 || currentAnalysisImage) && (
+            <div className="mt-6 lg:mt-0">
+              <h2 className="text-base md:text-lg font-semibold mb-3 md:mb-4 flex items-center gap-2">
+                <span className="w-6 h-6 md:w-8 md:h-8 bg-purple-600 text-white rounded-full flex items-center justify-center text-xs md:text-sm">
+                  4
+                </span>
+                AI分析
+              </h2>
+              <AnalysisPanel
+                tryOnImage={currentAnalysisImage || undefined}
+                onAnalyze={handleAnalyze}
+                autoAnalyze={false}
               />
-              <ImagePromptInput
-                onSubmit={handlePromptSubmit}
-                isEditing={true}
-                isLoading={loading}
-              />
-            </>
+            </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="border-t mt-8 md:mt-12 py-4 md:py-6 bg-white/80 backdrop-blur">
+        <div className="container mx-auto px-3 md:px-4 text-center text-xs md:text-sm text-gray-500">
+          <p>AI Try-On Platform - 智能试衣新体验</p>
+          <p className="mt-1">使用 OpenRouter + Gemini 2.5 Flash Image Preview + Gemini 2.0 Flash 技术</p>
+        </div>
+      </footer>
     </main>
   );
 }
