@@ -110,7 +110,17 @@ export default function Home() {
     }
   };
 
-  const handleAnalyze = async (image: string): Promise<any> => {
+  const handleAnalyze = async (image: string): Promise<{
+    analysis: string;
+    structuredData?: {
+      score?: number;
+      style?: string;
+      occasions?: string[];
+      season?: string;
+      pros?: string[];
+      suggestions?: string[];
+    };
+  }> => {
     try {
       const response = await fetch("/api/tryon/analyze", {
         method: "POST",

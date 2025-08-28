@@ -79,11 +79,12 @@ export async function POST(req: NextRequest) {
         size: buffer.length
       });
 
-    } catch (fetchError: any) {
+    } catch (fetchError) {
       console.error('Error fetching image:', fetchError);
       
       // Handle CORS errors
-      if (fetchError.message.includes('CORS')) {
+      const errorMessage = fetchError instanceof Error ? fetchError.message : String(fetchError);
+      if (errorMessage.includes('CORS')) {
         return NextResponse.json(
           { 
             success: false, 

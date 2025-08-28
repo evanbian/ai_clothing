@@ -34,17 +34,6 @@ const PROHIBITED_KEYWORDS = {
   ]
 };
 
-// Safe content guidelines
-const SAFETY_GUIDELINES = {
-  allowed: [
-    '日常服装', '正装', '休闲装', '运动装', '传统服饰', 
-    '工作服', '晚礼服', '婚纱', '民族服装', '时尚搭配'
-  ],
-  contexts: [
-    '商务场合', '休闲活动', '运动健身', '派对聚会', 
-    '旅游度假', '日常生活', '正式场合', '文化活动'
-  ]
-};
 
 export interface SafetyCheckResult {
   isSafe: boolean;
@@ -122,6 +111,7 @@ export function validateUserPhoto(imageData: string): SafetyCheckResult {
   
   // For now, we assume uploaded photos are safe if they pass basic checks
   // In production, you'd want to use Google Cloud Vision API or similar
+  void imageData; // Intentionally unused - placeholder implementation
   
   return { isSafe: true, violations: [] };
 }
@@ -132,6 +122,7 @@ export function validateUserPhoto(imageData: string): SafetyCheckResult {
 export function validateClothingImage(imageData: string): SafetyCheckResult {
   // Similar to user photo validation
   // Would check for inappropriate clothing items
+  void imageData; // Intentionally unused - placeholder implementation
   
   return { isSafe: true, violations: [] };
 }

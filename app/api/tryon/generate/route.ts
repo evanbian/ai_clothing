@@ -97,7 +97,13 @@ export async function POST(req: NextRequest) {
         temperature: modelConfig.temperature || 0.7
       });
 
-      const response = completion.choices[0].message as any; // Cast to any to handle OpenRouter's extended format
+      // Type for OpenRouter's extended response format
+      interface OpenRouterResponse {
+        content?: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
+        images?: Array<{ type: string; image_url?: { url: string } }>;
+      }
+      
+      const response = completion.choices[0].message as OpenRouterResponse;
       
       // Log the actual response for debugging
       console.log('API Response:', JSON.stringify(response, null, 2));
@@ -172,18 +178,19 @@ export async function POST(req: NextRequest) {
         description: description || "试衣效果已生成"
       });
 
-    } catch (apiError: any) {
+    } catch (apiError) {
       console.error('OpenRouter API error:', apiError);
       
       // Handle specific API errors
-      if (apiError.response?.status === 401) {
+      const error = apiError as { response?: { status: number }; message?: string };
+      if (error.response?.status === 401) {
         return NextResponse.json(
           { success: false, error: "Invalid API key" },
           { status: 401 }
         );
       }
       
-      if (apiError.response?.status === 429) {
+      if (error.response?.status === 429) {
         return NextResponse.json(
           { success: false, error: "Rate limit exceeded. Please try again later." },
           { status: 429 }
@@ -194,7 +201,7 @@ export async function POST(req: NextRequest) {
         { 
           success: false, 
           error: "Failed to generate try-on", 
-          details: apiError.message 
+          details: error.message || 'Unknown error' 
         },
         { status: 500 }
       );

@@ -33,14 +33,12 @@ interface TryOnResult {
 interface TryOnGalleryProps {
   results: TryOnResult[];
   onAnalyze?: (image: string) => void;
-  onRegenerate?: (settings: any) => void;
   isLoading?: boolean;
 }
 
 export function TryOnGallery({ 
   results, 
   onAnalyze, 
-  onRegenerate,
   isLoading 
 }: TryOnGalleryProps) {
   const [selectedImage, setSelectedImage] = useState<TryOnResult | null>(null);
@@ -150,6 +148,7 @@ export function TryOnGallery({
                   className="relative group cursor-pointer rounded-lg overflow-hidden border"
                   onClick={() => setSelectedImage(result)}
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={result.image}
                     alt={`Try-on result ${index + 1}`}
@@ -210,6 +209,7 @@ export function TryOnGallery({
             /* Carousel View */
             <div className="relative">
               <div className="aspect-[3/4] max-h-[600px] mx-auto">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={results[currentIndex].image}
                   alt={`Try-on result ${currentIndex + 1}`}
@@ -293,6 +293,7 @@ export function TryOnGallery({
           </DialogHeader>
           {selectedImage && (
             <div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={selectedImage.image}
                 alt="Full size try-on"

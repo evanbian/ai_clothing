@@ -179,6 +179,7 @@ export function TryOnUploader({ onImagesReady, onError }: TryOnUploaderProps) {
         <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
           {userPhoto ? (
             <div className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={userPhoto}
                 alt="User photo"
@@ -251,6 +252,7 @@ export function TryOnUploader({ onImagesReady, onError }: TryOnUploaderProps) {
 
           {clothingImage ? (
             <div className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={clothingImage}
                 alt="Clothing"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import ReactMarkdown from 'react-markdown';
@@ -45,14 +45,7 @@ export function AnalysisPanel({
   const [error, setError] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(true);
 
-  // Auto analyze when image changes
-  useEffect(() => {
-    if (autoAnalyze && tryOnImage && onAnalyze) {
-      handleAnalyze();
-    }
-  }, [tryOnImage, autoAnalyze]);
-
-  const handleAnalyze = async () => {
+  const handleAnalyze = useCallback(async () => {
     if (!tryOnImage || !onAnalyze) return;
 
     setIsAnalyzing(true);
@@ -67,7 +60,14 @@ export function AnalysisPanel({
     } finally {
       setIsAnalyzing(false);
     }
-  };
+  }, [tryOnImage, onAnalyze]);
+
+  // Auto analyze when image changes
+  useEffect(() => {
+    if (autoAnalyze && tryOnImage && onAnalyze) {
+      handleAnalyze();
+    }
+  }, [tryOnImage, autoAnalyze, handleAnalyze, onAnalyze]);
 
   const renderStars = (score: number) => {
     const fullStars = Math.floor(score / 2);

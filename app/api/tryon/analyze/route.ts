@@ -90,8 +90,8 @@ export async function POST(req: NextRequest) {
           analysisResult = response.content;
         } else if (Array.isArray(response.content)) {
           // Extract text from content parts
-          for (const part of response.content) {
-            if (part.type === 'text') {
+          for (const part of response.content as Array<{type: string; text?: string}>) {
+            if (part.type === 'text' && part.text) {
               analysisResult += part.text;
             }
           }
@@ -107,18 +107,19 @@ export async function POST(req: NextRequest) {
         structured: structuredAnalysis
       });
 
-    } catch (apiError: any) {
+    } catch (apiError) {
       console.error('OpenRouter API error:', apiError);
       
       // Handle specific API errors
-      if (apiError.response?.status === 401) {
+      const error = apiError as { response?: { status: number }; message?: string };
+      if (error.response?.status === 401) {
         return NextResponse.json(
           { success: false, error: "Invalid API key" },
           { status: 401 }
         );
       }
       
-      if (apiError.response?.status === 429) {
+      if (error.response?.status === 429) {
         return NextResponse.json(
           { success: false, error: "Rate limit exceeded. Please try again later." },
           { status: 429 }
@@ -129,7 +130,7 @@ export async function POST(req: NextRequest) {
         { 
           success: false, 
           error: "Failed to analyze try-on result", 
-          details: apiError.message 
+          details: error.message || 'Unknown error' 
         },
         { status: 500 }
       );
@@ -157,7 +158,14 @@ function parseAnalysisResult(text: string): {
   pros?: string[];
   suggestions?: string[];
 } {
-  const result: any = {};
+  const result: {
+    score?: number;
+    style?: string;
+    occasions?: string[];
+    season?: string;
+    pros?: string[];
+    suggestions?: string[];
+  } = {};
   
   try {
     // Extract score (looking for patterns like "8/10", "8分", "评分：8")
@@ -176,7 +184,7 @@ function parseAnalysisResult(text: string): {
     }
     
     // Extract occasions
-    const occasionSection = text.match(/适合场合[：:](.*?)(?:\n|$)/s);
+    const occasionSection = text.match(/适合场合[：:]([\s\S]*?)(?:\n|$)/);
     if (occasionSection) {
       const occasions = occasionSection[1].match(/[^，,、。\n]+/g);
       if (occasions) {
@@ -194,14 +202,14 @@ function parseAnalysisResult(text: string): {
     }
     
     // Extract pros (advantages)
-    const prosSection = text.match(/优点[：:](.+?)(?:改进|建议|缺点|\n\n|$)/s);
+    const prosSection = text.match(/优点[：:]([\s\S]+?)(?:改进|建议|缺点|\n\n|$)/);
     if (prosSection) {
       const pros = prosSection[1].split(/[，,。\n]/).filter(p => p.trim().length > 2);
       result.pros = pros.map(p => p.trim());
     }
     
     // Extract suggestions
-    const suggestionsSection = text.match(/(?:改进|建议)[：:](.+?)(?:\n\n|$)/s);
+    const suggestionsSection = text.match(/(?:改进|建议)[：:]([\s\S]+?)(?:\n\n|$)/);
     if (suggestionsSection) {
       const suggestions = suggestionsSection[1].split(/[，,。\n]/).filter(s => s.trim().length > 2);
       result.suggestions = suggestions.map(s => s.trim());
