@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  ai-tryon:
+    build: .
+    container_name: ai-tryon-app
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - OPEN_ROUTER_API_KEY=${OPEN_ROUTER_API_KEY}
+      - NEXT_PUBLIC_TRYON_MODEL_ID=${NEXT_PUBLIC_TRYON_MODEL_ID}
+      - NEXT_PUBLIC_ANALYSIS_MODEL_ID=${NEXT_PUBLIC_ANALYSIS_MODEL_ID}
+      - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
